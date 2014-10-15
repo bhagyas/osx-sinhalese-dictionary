@@ -1,0 +1,23 @@
+English-Sinhala, Sinhala-English dictionary for StarDict
+---------------------------------------------------------
+
+This is generated dictionary for StarDict.
+
+Data was downloaded from following website:
+<http://www.ucsc.cmb.ac.lk/ltrl/projects/EnSiTip/>
+
+The original source is available under GNU license.
+
+Dictionary was generated using:
+stardict-editor
+
+Conversion from English-Sinhala to Sinhala-English is done by si_en.pl
+Usage: ./si_en.pl > sinhala-english.tab
+
+Limitations: Sinhala-English translator does not handle sentences. only single words
+
+Install dictionary by copying dictionary files to dic/ folder in
+StarDict. On Linux it is usually /usr/share/stardict/dic/, on Windows
+C:\Program files\stardict\dic\.
+
+Date: Fri Sep 12 2008
