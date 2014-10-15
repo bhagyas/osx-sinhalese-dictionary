@@ -12,11 +12,26 @@ English to Sinhalese Dictionary for MacOSX Mavericks and Yosemite
 6. Click the Application Menu and Select Preferences
 7. Scroll down and choose English-Sinhalese dictionary
 
+**Tip**: If you're using more than 5 dictionaries, change the order of the dictionaries in the Dictionary app preferences panel by drag and drop in order to get the dictionary within the pop-up.
+
+###Screenshots guide
+
+####Dictionary as a tooltip with three finger tap on touchpad
+![](https://raw.githubusercontent.com/bhagyas/osx-sinhalese-dictionary/images/dictionary-images/dictionary-tooltip.png)
+
+####Manual Lookup
+![](https://raw.githubusercontent.com/bhagyas/osx-sinhalese-dictionary/images/dictionary-images/dictionary-example.png)
+
+####Enable Dictionary
+![](https://raw.githubusercontent.com/bhagyas/osx-sinhalese-dictionary/images/dictionary-images/dictionary-enable.png)
+
+
 Now you're set to use the dictionary.
 
 ###Credits
 - Language Technology Research Laboratory, University of Colombo
 - Buddhika Siddhisena
+- Bhagya Nirmaan Silva
 
 ###Author
 Bhagya Silva (http://www.about.me/bhagyas)
