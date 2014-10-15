@@ -1,7 +1,7 @@
 osx-sinhalese-dictionary
 ========================
 
-English to Sinhalese Dictionary for MacOSX Mavericks and Yosemite
+English to Sinhalese Dictionary for Mac OS X Mavericks and Yosemite
 
 ###How to install the dictionary
 1. Clone or Download the github source.
@@ -10,7 +10,7 @@ English to Sinhalese Dictionary for MacOSX Mavericks and Yosemite
 4. Press start when prompted for a dictionary name.
 5. Goto the Mac OSX Dictionary application
 6. Click the Application Menu and Select Preferences
-7. Scroll down and choose English-Sinhalese dictionary
+7. Scroll down and choose 'english-sinhala' dictionary
 
 **Tip**: If you're using more than 5 dictionaries, change the order of the dictionaries in the Dictionary app preferences panel by drag and drop in order to get the dictionary within the pop-up.
 
