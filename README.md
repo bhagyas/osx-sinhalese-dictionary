@@ -1,7 +1,7 @@
 osx-sinhalese-dictionary
 ========================
 
-English to Sinhalese Dictionary for Mac OS X Mavericks and Yosemite
+English to Sinhalese Dictionary for Mac OS X Mavericks, Yosemite, El Capitan, Sierra and macOS High Sierra, Mojave and Catalina.
 
 ### How to install the dictionary
 1. Clone or Download the github source.
