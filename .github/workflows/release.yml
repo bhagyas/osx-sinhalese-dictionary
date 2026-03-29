@@ -1,0 +1,51 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build:
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: Install test dependencies
+        run: pip install pytest
+
+      - name: Run tests
+        run: make test
+
+      - name: Make DDK binaries executable
+        run: chmod +x DictUnifier.app/Contents/Resources/bin/* DictUnifier.app/Contents/MacOS/*
+
+      - name: Build dictionaries
+        run: make all
+
+      - name: Build release zip
+        run: make release VERSION=${{ github.ref_name }}
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: ${{ github.ref_name }}
+          body: |
+            ## Installation
+
+            1. Download **sinhalese-dictionary-${{ github.ref_name }}.zip** below
+            2. Unzip it
+            3. Double-click **Install Dictionaries.command**
+            4. In Dictionary.app → Preferences, enable **english-sinhala** and **sinhala-english**
+
+            > If macOS blocks the `.command` file, right-click it and choose Open.
+          files: build/sinhalese-dictionary-${{ github.ref_name }}.zip
+          draft: false
+          prerelease: false

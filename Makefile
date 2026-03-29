@@ -16,7 +16,11 @@ DICTS = english-sinhala sinhala-english
 # Install location
 DICT_INSTALL_DIR = $(HOME)/Library/Dictionaries
 
-.PHONY: all clean install test $(DICTS)
+VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo "dev")
+RELEASE_NAME = sinhalese-dictionary-$(VERSION)
+RELEASE_ZIP  = $(BUILD_DIR)/$(RELEASE_NAME).zip
+
+.PHONY: all clean install release test $(DICTS)
 
 all: $(DICTS)
 
@@ -51,6 +55,18 @@ install: all
 	cp -r $(BUILD_DIR)/sinhala-english.dictionary $(DICT_INSTALL_DIR)/
 	@echo ""
 	@echo "Installed. Open Dictionary.app → Preferences and enable the dictionaries."
+
+## Build a release zip: pre-built dictionaries + double-click installer
+release: all
+	rm -rf $(BUILD_DIR)/$(RELEASE_NAME)
+	mkdir -p $(BUILD_DIR)/$(RELEASE_NAME)
+	cp -r $(BUILD_DIR)/english-sinhala.dictionary $(BUILD_DIR)/$(RELEASE_NAME)/
+	cp -r $(BUILD_DIR)/sinhala-english.dictionary $(BUILD_DIR)/$(RELEASE_NAME)/
+	cp $(SCRIPTS_DIR)/install.command $(BUILD_DIR)/$(RELEASE_NAME)/
+	chmod +x $(BUILD_DIR)/$(RELEASE_NAME)/install.command
+	cd $(BUILD_DIR) && zip -r $(RELEASE_NAME).zip $(RELEASE_NAME)
+	@echo ""
+	@echo "Release zip: $(RELEASE_ZIP)"
 
 ## Run tests
 test:
