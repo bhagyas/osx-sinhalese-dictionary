@@ -5,11 +5,10 @@ English to Sinhalese Dictionary for macOS (Mavericks through Sonoma, including A
 
 ### Requirements
 
-- macOS
+- macOS (Intel or Apple Silicon with Rosetta 2)
 - Python 3
-- Apple's **Dictionary Development Kit** — install via Xcode → Settings → Components → **Xcode Additional Tools** (look for "Dictionary Development Kit" in the DMG)
 
-> **Note:** The repo also bundles `DictUnifier.app` as a fallback for users who prefer a GUI. The `make` workflow does not require it.
+All build tools are bundled in `DictUnifier.app` — no separate Dictionary Development Kit installation required.
 
 ---
 

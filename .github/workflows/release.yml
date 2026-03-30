@@ -7,7 +7,8 @@ on:
 
 jobs:
   build:
-    runs-on: macos-latest
+    # Bundled DDK binaries are x86_64-only; macos-13 is the last Intel runner.
+    runs-on: macos-13
 
     steps:
       - name: Checkout
