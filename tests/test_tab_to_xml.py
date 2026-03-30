@@ -240,3 +240,39 @@ def test_sinhala_headword():
         assert "<li>house</li>" in xml
     finally:
         os.unlink(tab)
+
+
+# ---------------------------------------------------------------------------
+# Combining character filtering
+# ---------------------------------------------------------------------------
+
+
+def test_combining_char_headword_skipped():
+    # U+0DCF SINHALA VOWEL SIGN AELA-PILLA starts with Mc category — invalid headword
+    tab = make_tab_file("ාේමන්\tromans\ngood\tdef\n")
+    try:
+        xml = tab_to_xml(tab)
+        assert xml.count("<d:entry") == 1
+        assert "ාේමන්" not in xml
+    finally:
+        os.unlink(tab)
+
+
+def test_combining_char_al_lakuna_skipped():
+    # U+0DCA SINHALA SIGN AL-LAKUNA is Mn category
+    tab = make_tab_file("්ෙබියානුවාදය\ttest\ngood\tdef\n")
+    try:
+        xml = tab_to_xml(tab)
+        assert xml.count("<d:entry") == 1
+    finally:
+        os.unlink(tab)
+
+
+def test_valid_sinhala_not_skipped():
+    # Starts with a normal Sinhala consonant — must not be filtered
+    tab = make_tab_file("ගෙදර\thome\n")
+    try:
+        xml = tab_to_xml(tab)
+        assert xml.count("<d:entry") == 1
+    finally:
+        os.unlink(tab)

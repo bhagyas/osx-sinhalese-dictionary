@@ -11,6 +11,7 @@ directly to build_dict.sh from the Dictionary Development Kit.
 import argparse
 import html
 import sys
+import unicodedata
 
 
 def tab_to_xml(tab_file: str) -> str:
@@ -24,6 +25,11 @@ def tab_to_xml(tab_file: str) -> str:
             word = word.strip()
             defs = [d.strip() for d in definitions.split("|") if d.strip()]
             if not word or not defs:
+                continue
+            # Skip headwords starting with a combining character — they are
+            # malformed (e.g. a Sinhala vowel sign with no base consonant) and
+            # cause normalize_key_text to abort.
+            if unicodedata.category(word[0]) in ("Mn", "Mc", "Me"):
                 continue
             entries.append((i, word, defs))
 
