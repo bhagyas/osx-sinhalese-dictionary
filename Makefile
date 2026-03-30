@@ -27,9 +27,11 @@ all: $(DICTS)
 ## Build a specific dictionary by name (e.g. make english-sinhala)
 $(DICTS): %: $(BUILD_DIR)/%.dictionary
 
-## Convert .tab → Apple DDK XML
+## Convert .tab → Apple DDK XML (merges enriched JSONL if present)
 $(BUILD_DIR)/%.xml: $(DICT_DIR)/%.tab | $(BUILD_DIR)
-	python3 $(SCRIPTS_DIR)/tab_to_xml.py $< -o $@
+	python3 $(SCRIPTS_DIR)/tab_to_xml.py $< \
+	  $(if $(wildcard $(DICT_DIR)/$*.enriched.jsonl),--enriched $(DICT_DIR)/$*.enriched.jsonl,) \
+	  -o $@
 
 ## Generate a per-dictionary Info.plist from the template
 $(BUILD_DIR)/%.plist: $(PLIST_TMPL) | $(BUILD_DIR)
@@ -67,6 +69,18 @@ release: all
 	cd $(BUILD_DIR) && zip -r $(RELEASE_NAME).zip $(RELEASE_NAME)
 	@echo ""
 	@echo "Release zip: $(RELEASE_ZIP)"
+
+## Enrich English→Sinhala via translategemma (resumable, requires Ollama)
+enrich-en-si:
+	python3 $(SCRIPTS_DIR)/enrich.py $(DICT_DIR)/english-sinhala.tab \
+	  --source-lang "English (en)" --target-lang "Sinhala (si)" \
+	  --output $(DICT_DIR)/english-sinhala.enriched.jsonl
+
+## Improve Sinhala→English translations (the auto-generated reverse file)
+enrich-si-en:
+	python3 $(SCRIPTS_DIR)/enrich.py $(DICT_DIR)/sinhala-english.tab \
+	  --source-lang "Sinhala (si)" --target-lang "English (en)" \
+	  --output $(DICT_DIR)/sinhala-english.enriched.jsonl
 
 ## Run tests
 test:

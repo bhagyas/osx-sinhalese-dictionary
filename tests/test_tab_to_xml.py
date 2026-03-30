@@ -1,3 +1,4 @@
+import json
 import os
 import re
 import sys
@@ -8,7 +9,7 @@ from pathlib import Path
 import pytest
 
 sys.path.insert(0, str(Path(__file__).parent.parent / "scripts"))
-from tab_to_xml import tab_to_xml
+from tab_to_xml import load_enriched, tab_to_xml
 
 NS = {
     "d": "http://www.apple.com/DTDs/DictionaryService-1.0.rng",
@@ -276,3 +277,76 @@ def test_valid_sinhala_not_skipped():
         assert xml.count("<d:entry") == 1
     finally:
         os.unlink(tab)
+
+
+# ---------------------------------------------------------------------------
+# Enriched JSONL merging
+# ---------------------------------------------------------------------------
+
+
+def make_jsonl(records: list[dict]) -> str:
+    f = tempfile.NamedTemporaryFile(
+        mode="w", suffix=".jsonl", delete=False, encoding="utf-8"
+    )
+    for rec in records:
+        f.write(json.dumps(rec, ensure_ascii=False) + "\n")
+    f.close()
+    return f.name
+
+
+def test_enriched_translation_appended():
+    tab = make_tab_file("hello\tworld\n")
+    jsonl = make_jsonl([{"word": "hello", "translation": "ආයුබෝවන්"}])
+    try:
+        xml = tab_to_xml(tab, jsonl)
+        assert 'class="enriched"' in xml
+        assert "ආයුබෝවන්" in xml
+    finally:
+        os.unlink(tab)
+        os.unlink(jsonl)
+
+
+def test_no_enriched_file_unchanged():
+    tab = make_tab_file("hello\tworld\n")
+    try:
+        xml = tab_to_xml(tab, None)
+        assert 'class="enriched"' not in xml
+    finally:
+        os.unlink(tab)
+
+
+def test_enriched_only_for_matching_word():
+    tab = make_tab_file("hello\tworld\ncat\tpet\n")
+    jsonl = make_jsonl([{"word": "hello", "translation": "ආයුබෝවන්"}])
+    try:
+        xml = tab_to_xml(tab, jsonl)
+        assert xml.count('class="enriched"') == 1
+    finally:
+        os.unlink(tab)
+        os.unlink(jsonl)
+
+
+def test_load_enriched_returns_dict():
+    jsonl = make_jsonl([
+        {"word": "hello", "translation": "ආයුබෝවන්"},
+        {"word": "cat", "translation": "පූසා"},
+    ])
+    try:
+        enriched = load_enriched(jsonl)
+        assert enriched["hello"] == "ආයුබෝවන්"
+        assert enriched["cat"] == "පූසා"
+    finally:
+        os.unlink(jsonl)
+
+
+def test_enriched_html_escaped():
+    tab = make_tab_file("a&b\tdef\n")
+    jsonl = make_jsonl([{"word": "a&b", "translation": "<test>"}])
+    try:
+        xml = tab_to_xml(tab, jsonl)
+        assert "&lt;test&gt;" in xml
+        assert "<test>" not in xml.split("?>", 1)[1]
+        parse(xml)
+    finally:
+        os.unlink(tab)
+        os.unlink(jsonl)
