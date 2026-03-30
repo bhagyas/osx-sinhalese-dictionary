@@ -5,7 +5,7 @@ English to Sinhalese Dictionary for macOS (Mavericks through Sonoma, including A
 
 ### Requirements
 
-- macOS (Intel or Apple Silicon with Rosetta 2)
+- macOS (Intel or Apple Silicon — Rosetta 2 is used automatically for the bundled build tools)
 - Python 3
 
 All build tools are bundled in `DictUnifier.app` — no separate Dictionary Development Kit installation required.

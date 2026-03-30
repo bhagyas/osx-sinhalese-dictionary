@@ -7,10 +7,14 @@ on:
 
 jobs:
   build:
-    # Bundled DDK binaries are x86_64-only; macos-13 is the last Intel runner.
-    runs-on: macos-13
+    # Bundled DDK binaries are x86_64-only; Rosetta 2 provides transparent
+    # translation on Apple Silicon runners.
+    runs-on: macos-latest
 
     steps:
+      - name: Install Rosetta 2
+        run: softwareupdate --install-rosetta --agree-to-license
+
       - name: Checkout
         uses: actions/checkout@v4
 
