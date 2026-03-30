@@ -72,6 +72,28 @@ release: all
 
 TRANSLATION_MODEL  ?= translategemma:4b
 DEFINITION_MODEL   ?= gemma3:12b
+TRIAL_LIMIT        ?= 20
+TRIAL_OUTPUT       ?= /tmp/enrich-trial.jsonl
+
+.PHONY: enrich-en-si enrich-si-en enrich-trial enrich-trial-inspect
+
+## Trial run: enrich first $(TRIAL_LIMIT) entries to /tmp/enrich-trial.jsonl
+enrich-trial:
+	@rm -f $(TRIAL_OUTPUT)
+	python3 $(SCRIPTS_DIR)/enrich.py $(DICT_DIR)/english-sinhala.tab \
+	  --source-lang "English (en)" --target-lang "Sinhala (si)" \
+	  --model $(TRANSLATION_MODEL) \
+	  --definition-model $(DEFINITION_MODEL) \
+	  --output $(TRIAL_OUTPUT) \
+	  --limit $(TRIAL_LIMIT)
+	@echo ""
+	@echo "Trial output: $(TRIAL_OUTPUT)"
+	@echo "Run 'make enrich-trial-inspect' to pretty-print the results."
+
+## Pretty-print the trial output
+enrich-trial-inspect:
+	@cat $(TRIAL_OUTPUT) | python3 -c \
+	  "import sys,json; [print(json.dumps(json.loads(l), indent=2, ensure_ascii=False)) for l in sys.stdin if l.strip()]" | less
 
 ## Full enrichment: English definitions (gemma3) + Sinhala translations (translategemma)
 enrich-en-si:
