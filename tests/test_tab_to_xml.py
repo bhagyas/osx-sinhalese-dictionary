@@ -294,13 +294,37 @@ def make_jsonl(records: list[dict]) -> str:
     return f.name
 
 
-def test_enriched_translation_appended():
+def test_enriched_pos_rendered():
     tab = make_tab_file("hello\tworld\n")
-    jsonl = make_jsonl([{"word": "hello", "translation": "ආයුබෝවන්"}])
+    jsonl = make_jsonl([{"word": "hello", "translation": "ආයුබෝවන්", "pos": "greeting", "romanized": "Ayubowan", "alternatives": []}])
     try:
         xml = tab_to_xml(tab, jsonl)
-        assert 'class="enriched"' in xml
-        assert "ආයුබෝවන්" in xml
+        assert 'class="pos"' in xml
+        assert "greeting" in xml
+    finally:
+        os.unlink(tab)
+        os.unlink(jsonl)
+
+
+def test_enriched_romanized_rendered():
+    tab = make_tab_file("hello\tworld\n")
+    jsonl = make_jsonl([{"word": "hello", "translation": "ආයුබෝවන්", "pos": "", "romanized": "Ayubowan", "alternatives": []}])
+    try:
+        xml = tab_to_xml(tab, jsonl)
+        assert 'class="romanized"' in xml
+        assert "Ayubowan" in xml
+    finally:
+        os.unlink(tab)
+        os.unlink(jsonl)
+
+
+def test_enriched_alternatives_rendered():
+    tab = make_tab_file("hello\tworld\n")
+    jsonl = make_jsonl([{"word": "hello", "translation": "ආයුබෝවන්", "pos": "", "romanized": "", "alternatives": ["හෙලෝ"]}])
+    try:
+        xml = tab_to_xml(tab, jsonl)
+        assert 'class="alternatives"' in xml
+        assert "හෙලෝ" in xml
     finally:
         os.unlink(tab)
         os.unlink(jsonl)
@@ -310,17 +334,18 @@ def test_no_enriched_file_unchanged():
     tab = make_tab_file("hello\tworld\n")
     try:
         xml = tab_to_xml(tab, None)
-        assert 'class="enriched"' not in xml
+        assert 'class="pos"' not in xml
+        assert 'class="romanized"' not in xml
     finally:
         os.unlink(tab)
 
 
 def test_enriched_only_for_matching_word():
     tab = make_tab_file("hello\tworld\ncat\tpet\n")
-    jsonl = make_jsonl([{"word": "hello", "translation": "ආයුබෝවන්"}])
+    jsonl = make_jsonl([{"word": "hello", "translation": "ආයුබෝවන්", "pos": "greeting", "romanized": "", "alternatives": []}])
     try:
         xml = tab_to_xml(tab, jsonl)
-        assert xml.count('class="enriched"') == 1
+        assert xml.count('class="pos"') == 1
     finally:
         os.unlink(tab)
         os.unlink(jsonl)
@@ -328,24 +353,25 @@ def test_enriched_only_for_matching_word():
 
 def test_load_enriched_returns_dict():
     jsonl = make_jsonl([
-        {"word": "hello", "translation": "ආයුබෝවන්"},
-        {"word": "cat", "translation": "පූසා"},
+        {"word": "hello", "translation": "ආයුබෝවන්", "pos": "greeting", "romanized": "Ayubowan", "alternatives": []},
+        {"word": "cat", "translation": "පූසා", "pos": "noun", "romanized": "Pusa", "alternatives": []},
     ])
     try:
         enriched = load_enriched(jsonl)
-        assert enriched["hello"] == "ආයුබෝවන්"
-        assert enriched["cat"] == "පූසා"
+        assert enriched["hello"]["translation"] == "ආයුබෝවන්"
+        assert enriched["hello"]["pos"] == "greeting"
+        assert enriched["cat"]["translation"] == "පූසා"
     finally:
         os.unlink(jsonl)
 
 
 def test_enriched_html_escaped():
-    tab = make_tab_file("a&b\tdef\n")
-    jsonl = make_jsonl([{"word": "a&b", "translation": "<test>"}])
+    tab = make_tab_file("hello\tdef\n")
+    jsonl = make_jsonl([{"word": "hello", "translation": "x", "pos": "<script>", "romanized": "", "alternatives": []}])
     try:
         xml = tab_to_xml(tab, jsonl)
-        assert "&lt;test&gt;" in xml
-        assert "<test>" not in xml.split("?>", 1)[1]
+        assert "&lt;script&gt;" in xml
+        assert "<script>" not in xml.split("?>", 1)[1]
         parse(xml)
     finally:
         os.unlink(tab)

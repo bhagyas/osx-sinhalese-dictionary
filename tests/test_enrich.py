@@ -8,7 +8,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 sys.path.insert(0, str(Path(__file__).parent.parent / "scripts"))
-from enrich import load_existing, load_tab, make_prompt, translate
+from enrich import is_clean, load_existing, load_tab, make_prompt, parse_response, translate
 
 
 # ---------------------------------------------------------------------------
@@ -38,9 +38,98 @@ def test_prompt_reverse_direction():
     assert prompt.endswith("ගෙදර")
 
 
-def test_prompt_instructs_no_commentary():
+def test_prompt_requests_json():
     prompt = make_prompt("hello", "English (en)", "Sinhala (si)")
-    assert "without any additional" in prompt
+    assert "JSON" in prompt
+
+
+def test_prompt_requests_all_fields():
+    prompt = make_prompt("hello", "English (en)", "Sinhala (si)")
+    for field in ("translation", "alternatives", "romanized", "pos"):
+        assert field in prompt
+
+
+# ---------------------------------------------------------------------------
+# is_clean
+# ---------------------------------------------------------------------------
+
+
+def test_clean_sinhala_only():
+    assert is_clean("ආයුබෝවන්") is True
+
+
+def test_clean_ascii_only():
+    assert is_clean("hello") is True
+
+
+def test_dirty_sinhala_mixed_with_latin_extended():
+    # Sinhala + German extended Latin → garbage
+    assert is_clean("සුභවාünsche") is False
+
+
+def test_clean_sinhala_with_punctuation():
+    assert is_clean("ආයුබෝවන්!") is True
+
+
+# ---------------------------------------------------------------------------
+# parse_response
+# ---------------------------------------------------------------------------
+
+
+def test_parse_response_basic():
+    raw = json.dumps({
+        "translation": "ආයුබෝවන්",
+        "alternatives": ["හෙලෝ"],
+        "romanized": "Ayubowan",
+        "pos": "greeting",
+    })
+    result = parse_response(raw, "hello")
+    assert result["translation"] == "ආයුබෝවන්"
+    assert result["romanized"] == "Ayubowan"
+    assert result["pos"] == "greeting"
+
+
+def test_parse_response_deduplicates_alternatives():
+    raw = json.dumps({
+        "translation": "ආයුබෝවන්",
+        "alternatives": ["ආයුබෝවන්", "ආයුබෝවන්", "හෙලෝ"],
+        "romanized": "Ayubowan",
+        "pos": "greeting",
+    })
+    result = parse_response(raw, "hello")
+    assert result["alternatives"] == ["හෙලෝ"]
+
+
+def test_parse_response_filters_garbage_alternatives():
+    raw = json.dumps({
+        "translation": "ආයුබෝවන්",
+        "alternatives": ["සුභවාünsche", "හෙලෝ"],
+        "romanized": "Ayubowan",
+        "pos": "greeting",
+    })
+    result = parse_response(raw, "hello")
+    assert "සුභවාünsche" not in result["alternatives"]
+    assert "හෙලෝ" in result["alternatives"]
+
+
+def test_parse_response_strips_markdown_fences():
+    raw = "```json\n" + json.dumps({"translation": "ආයුබෝවන්", "alternatives": [], "romanized": "", "pos": ""}) + "\n```"
+    result = parse_response(raw, "hello")
+    assert result["translation"] == "ආයුබෝවන්"
+
+
+def test_parse_response_fallback_on_bad_json():
+    result = parse_response("not valid json at all", "hello")
+    assert result["translation"] == "hello"
+    assert result["alternatives"] == []
+    assert result["romanized"] == ""
+    assert result["pos"] == ""
+
+
+def test_parse_response_empty_alternatives():
+    raw = json.dumps({"translation": "ආයුබෝවන්", "alternatives": [], "romanized": "Ayubowan", "pos": "noun"})
+    result = parse_response(raw, "hello")
+    assert result["alternatives"] == []
 
 
 # ---------------------------------------------------------------------------
@@ -179,26 +268,26 @@ def mock_response(content: str) -> MagicMock:
     return resp
 
 
-def test_translate_returns_content():
-    with patch("requests.post", return_value=mock_response("ආයුබෝවන්")):
+def test_translate_returns_structured_dict():
+    raw = json.dumps({
+        "translation": "ආයුබෝවන්",
+        "alternatives": [],
+        "romanized": "Ayubowan",
+        "pos": "greeting",
+    })
+    with patch("requests.post", return_value=mock_response(raw)):
         result = translate(
             "hello", "English (en)", "Sinhala (si)",
             "translategemma:4b", "http://localhost:11434/api/chat",
         )
-    assert result == "ආයුබෝවන්"
-
-
-def test_translate_strips_whitespace():
-    with patch("requests.post", return_value=mock_response("  ආයුබෝවන්\n")):
-        result = translate(
-            "hello", "English (en)", "Sinhala (si)",
-            "translategemma:4b", "http://localhost:11434/api/chat",
-        )
-    assert result == "ආයුබෝවන්"
+    assert result["translation"] == "ආයුබෝවන්"
+    assert result["romanized"] == "Ayubowan"
+    assert result["pos"] == "greeting"
 
 
 def test_translate_sends_correct_model():
-    with patch("requests.post", return_value=mock_response("x")) as mock_post:
+    raw = json.dumps({"translation": "x", "alternatives": [], "romanized": "", "pos": ""})
+    with patch("requests.post", return_value=mock_response(raw)) as mock_post:
         translate(
             "hello", "English (en)", "Sinhala (si)",
             "translategemma:4b", "http://localhost:11434/api/chat",
@@ -208,7 +297,8 @@ def test_translate_sends_correct_model():
 
 
 def test_translate_sends_prompt_as_user_message():
-    with patch("requests.post", return_value=mock_response("x")) as mock_post:
+    raw = json.dumps({"translation": "x", "alternatives": [], "romanized": "", "pos": ""})
+    with patch("requests.post", return_value=mock_response(raw)) as mock_post:
         translate(
             "hello", "English (en)", "Sinhala (si)",
             "translategemma:4b", "http://localhost:11434/api/chat",

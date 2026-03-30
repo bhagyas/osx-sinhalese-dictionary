@@ -2,11 +2,17 @@
 """Enrich dictionary tab files using a local translategemma model via Ollama.
 
 Reads a .tab file and for each entry calls translategemma to produce a
-fresh translation. Results are appended to a .jsonl file so the run is
-fully resumable — stop and restart at any time.
+structured enrichment record containing:
+  - translation:   primary translation in the target language
+  - alternatives:  additional synonyms (deduplicated, garbage-filtered)
+  - romanized:     romanized pronunciation of the primary translation
+  - pos:           part of speech (noun, verb, adjective, etc.)
+
+Results are appended to a .jsonl file so the run is fully resumable —
+stop and restart at any time without losing progress.
 
 The enriched .jsonl is committed to the repo as a permanent artefact.
-tab_to_xml.py will merge it into the XML output automatically if present.
+tab_to_xml.py merges it into the XML output automatically if present.
 
 Examples:
 
@@ -28,6 +34,7 @@ Examples:
 
 import argparse
 import json
+import re
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
@@ -43,12 +50,54 @@ def make_prompt(word: str, source_lang: str, target_lang: str) -> str:
         f"You are a professional {source_lang} to {target_lang} translator. "
         f"Your goal is to accurately convey the meaning and nuances of the original "
         f"{source_lang} text while adhering to {target_lang} grammar, vocabulary, "
-        f"and cultural sensitivities.\n"
-        f"Produce only the {target_lang} translation, without any additional "
-        f"explanations or commentary. "
-        f"Please translate the following {source_lang} text into {target_lang}:\n\n\n"
-        f"{word}"
+        f"and cultural sensitivities.\n\n"
+        f"For the {source_lang} word below, provide the following in JSON format "
+        f"only, no commentary:\n"
+        f'- "translation": the primary {target_lang} translation\n'
+        f'- "alternatives": up to 3 alternative {target_lang} translations or synonyms\n'
+        f'- "romanized": romanized pronunciation of the primary translation\n'
+        f'- "pos": part of speech (noun, verb, adjective, adverb, etc.)\n\n'
+        f"{source_lang} word: {word}"
     )
+
+
+def is_clean(text: str) -> bool:
+    """Return False if text looks like garbage (e.g. Latin mixed into Sinhala)."""
+    # Allow pure ASCII (for en→si reverse entries) or pure Sinhala Unicode block
+    # Reject strings that mix Sinhala script with non-ASCII Latin characters
+    has_sinhala = bool(re.search(r"[\u0D80-\u0DFF]", text))
+    has_latin_extended = bool(re.search(r"[À-ÿ]", text))
+    return not (has_sinhala and has_latin_extended)
+
+
+def parse_response(raw: str, primary: str) -> dict:
+    """Parse the JSON blob from the model, with graceful fallback."""
+    # Strip markdown code fences if present
+    cleaned = re.sub(r"^```(?:json)?\s*|\s*```$", "", raw.strip(), flags=re.MULTILINE)
+    try:
+        data = json.loads(cleaned)
+    except json.JSONDecodeError:
+        return {"translation": primary, "alternatives": [], "romanized": "", "pos": ""}
+
+    translation = str(data.get("translation", primary)).strip() or primary
+    romanized = str(data.get("romanized", "")).strip()
+    pos = str(data.get("pos", "")).strip()
+
+    # Deduplicate and filter garbage from alternatives
+    seen = {translation}
+    alternatives = []
+    for alt in data.get("alternatives", []):
+        alt = str(alt).strip()
+        if alt and alt not in seen and is_clean(alt):
+            alternatives.append(alt)
+            seen.add(alt)
+
+    return {
+        "translation": translation,
+        "alternatives": alternatives,
+        "romanized": romanized,
+        "pos": pos,
+    }
 
 
 def translate(
@@ -57,7 +106,7 @@ def translate(
     target_lang: str,
     model: str,
     ollama_url: str,
-) -> str:
+) -> dict:
     prompt = make_prompt(word, source_lang, target_lang)
     resp = requests.post(
         ollama_url,
@@ -69,7 +118,8 @@ def translate(
         timeout=60,
     )
     resp.raise_for_status()
-    return resp.json()["message"]["content"].strip()
+    raw = resp.json()["message"]["content"].strip()
+    return parse_response(raw, word)
 
 
 def load_tab(tab_path: str) -> list[tuple[str, list[str]]]:
@@ -136,17 +186,22 @@ def enrich(
     with open(out_path, "a", encoding="utf-8") as f:
         for i, (word, existing) in enumerate(pending, 1):
             try:
-                translation = translate(word, source_lang, target_lang, model, ollama_url)
+                enriched = translate(word, source_lang, target_lang, model, ollama_url)
                 record = {
                     "word": word,
                     "existing": existing,
-                    "translation": translation,
+                    **enriched,
                     "model": model,
                     "ts": datetime.now(timezone.utc).isoformat(),
                 }
                 f.write(json.dumps(record, ensure_ascii=False) + "\n")
                 f.flush()
-                print(f"[{i}/{total}] {word} → {translation}", flush=True)
+                print(
+                    f"[{i}/{total}] {word} → {enriched['translation']}"
+                    + (f"  [{enriched['pos']}]" if enriched["pos"] else "")
+                    + (f"  /{enriched['romanized']}/" if enriched["romanized"] else ""),
+                    flush=True,
+                )
             except Exception as e:
                 errors += 1
                 print(f"[{i}/{total}] ERROR {word}: {e}", file=sys.stderr, flush=True)

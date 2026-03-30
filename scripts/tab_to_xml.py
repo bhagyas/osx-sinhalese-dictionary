@@ -20,9 +20,9 @@ import unicodedata
 from pathlib import Path
 
 
-def load_enriched(jsonl_path: str) -> dict[str, str]:
-    """Return {word: translation} from an enriched .jsonl file."""
-    enriched: dict[str, str] = {}
+def load_enriched(jsonl_path: str) -> dict[str, dict]:
+    """Return {word: record} from an enriched .jsonl file."""
+    enriched: dict[str, dict] = {}
     with open(jsonl_path, encoding="utf-8") as f:
         for line in f:
             line = line.strip()
@@ -31,7 +31,7 @@ def load_enriched(jsonl_path: str) -> dict[str, str]:
             try:
                 rec = json.loads(line)
                 if rec.get("word") and rec.get("translation"):
-                    enriched[rec["word"]] = rec["translation"]
+                    enriched[rec["word"]] = rec
             except (json.JSONDecodeError, KeyError):
                 pass
     return enriched
@@ -77,9 +77,14 @@ def tab_to_xml(tab_file: str, enriched_file: str | None = None) -> str:
                 parts.append(f"      <li>{html.escape(d)}</li>")
             parts.append("    </ol>")
         if word in enriched:
-            parts.append(
-                f'    <p class="enriched">{html.escape(enriched[word])}</p>'
-            )
+            rec = enriched[word]
+            if rec.get("pos"):
+                parts.append(f'    <p class="pos"><em>{html.escape(rec["pos"])}</em></p>')
+            if rec.get("romanized"):
+                parts.append(f'    <p class="romanized">/{html.escape(rec["romanized"])}/</p>')
+            if rec.get("alternatives"):
+                alts = ", ".join(html.escape(a) for a in rec["alternatives"])
+                parts.append(f'    <p class="alternatives">{alts}</p>')
         parts.append("  </d:entry>")
 
     parts.append("</d:dictionary>")
