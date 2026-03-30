@@ -50,9 +50,84 @@ div.y {
     color: #333;
 }
 
+/* --- Enriched content --- */
+
+p.phonetic {
+    font-size: 90%;
+    color: #555;
+    margin: 2px 0 4px;
+}
+
+p.forms {
+    font-size: 85%;
+    color: #777;
+    font-style: italic;
+    margin: 0 0 6px;
+}
+
+span.pos {
+    font-size: 85%;
+    font-style: italic;
+    color: #888;
+    margin-right: 6px;
+}
+
+span.label {
+    font-size: 80%;
+    color: #999;
+    margin-right: 6px;
+}
+
+span.sense {
+    display: block;
+    margin: 2px 0;
+}
+
+span.sense-si {
+    display: block;
+    color: #2a6496;
+    font-size: 95%;
+    margin: 1px 0 4px 1em;
+}
+
+ul.sub-senses {
+    margin: 4px 0 4px 1em;
+    padding-left: 1em;
+    list-style-type: disc;
+}
+
+ul.sub-senses li {
+    margin-bottom: 4px;
+    font-size: 95%;
+}
+
+p.synonyms {
+    font-size: 85%;
+    color: #777;
+    margin: 4px 0 0;
+}
+
+p.romanized {
+    font-size: 88%;
+    color: #666;
+    font-style: italic;
+}
+
+p.alternatives {
+    font-size: 88%;
+    color: #555;
+}
+
+/* --- Dark mode --- */
+
 @media (prefers-dark-interface)
 {
     body {
         color: white;
     }
+
+    p.phonetic, span.pos, span.label, p.forms, p.synonyms,
+    p.romanized, p.alternatives { color: #aaa; }
+
+    span.sense-si { color: #7ab8e8; }
 }

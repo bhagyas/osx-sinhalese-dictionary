@@ -70,16 +70,22 @@ release: all
 	@echo ""
 	@echo "Release zip: $(RELEASE_ZIP)"
 
-## Enrich English→Sinhala via translategemma (resumable, requires Ollama)
+TRANSLATION_MODEL  ?= translategemma:4b
+DEFINITION_MODEL   ?= gemma3:12b
+
+## Full enrichment: English definitions (gemma3) + Sinhala translations (translategemma)
 enrich-en-si:
 	python3 $(SCRIPTS_DIR)/enrich.py $(DICT_DIR)/english-sinhala.tab \
 	  --source-lang "English (en)" --target-lang "Sinhala (si)" \
+	  --model $(TRANSLATION_MODEL) \
+	  --definition-model $(DEFINITION_MODEL) \
 	  --output $(DICT_DIR)/english-sinhala.enriched.jsonl
 
-## Improve Sinhala→English translations (the auto-generated reverse file)
+## Translation-only enrichment for Sinhala→English (no definition generation)
 enrich-si-en:
 	python3 $(SCRIPTS_DIR)/enrich.py $(DICT_DIR)/sinhala-english.tab \
 	  --source-lang "Sinhala (si)" --target-lang "English (en)" \
+	  --model $(TRANSLATION_MODEL) \
 	  --output $(DICT_DIR)/sinhala-english.enriched.jsonl
 
 ## Run tests

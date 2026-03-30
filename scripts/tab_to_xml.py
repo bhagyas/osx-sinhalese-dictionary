@@ -8,8 +8,16 @@ Output is Apple Dictionary Development Kit XML, suitable for passing
 directly to build_dict.sh from the Dictionary Development Kit.
 
 If an --enriched JSONL file is supplied (produced by enrich.py), each
-entry is augmented with the LLM-generated translation shown as an
-additional section in the definition body.
+entry is augmented with LLM-generated content. Two record formats are
+supported:
+
+  Rich format (two-model pipeline, has "definitions" key):
+    phonetic, grammatical forms, numbered definitions with pos/register/
+    region/synonyms, and Sinhala translations of each sense.
+
+  Simple format (translation-only, has "translation" key):
+    primary translation, romanized pronunciation, part of speech,
+    and alternative translations.
 """
 
 import argparse
@@ -30,11 +38,73 @@ def load_enriched(jsonl_path: str) -> dict[str, dict]:
                 continue
             try:
                 rec = json.loads(line)
-                if rec.get("word") and rec.get("translation"):
+                if rec.get("word"):
                     enriched[rec["word"]] = rec
             except (json.JSONDecodeError, KeyError):
                 pass
     return enriched
+
+
+def render_rich(rec: dict) -> list[str]:
+    """Render a full definition record (two-model pipeline output)."""
+    parts = []
+
+    if rec.get("phonetic"):
+        parts.append(f'    <p class="phonetic">{html.escape(rec["phonetic"])}</p>')
+
+    if rec.get("forms"):
+        forms_str = "; ".join(
+            f'{html.escape(f["type"])}: {html.escape(f["form"])}'
+            for f in rec["forms"] if f.get("type") and f.get("form")
+        )
+        if forms_str:
+            parts.append(f'    <p class="forms">{forms_str}</p>')
+
+    definitions = rec.get("definitions", [])
+    if definitions:
+        parts.append("    <ol>")
+        for d in definitions:
+            parts.append("      <li>")
+            if d.get("pos"):
+                parts.append(f'        <span class="pos">{html.escape(d["pos"])}</span>')
+            if d.get("register") or d.get("region"):
+                labels = " · ".join(
+                    html.escape(x) for x in [d.get("register"), d.get("region")] if x
+                )
+                parts.append(f'        <span class="label">{labels}</span>')
+            if d.get("sense"):
+                parts.append(f'        <span class="sense">{html.escape(d["sense"])}</span>')
+            if d.get("sense_translated"):
+                parts.append(f'        <span class="sense-si">{html.escape(d["sense_translated"])}</span>')
+            if d.get("sub_senses"):
+                parts.append('        <ul class="sub-senses">')
+                for j, sub in enumerate(d["sub_senses"]):
+                    parts.append(f"          <li>{html.escape(sub)}")
+                    translated = (d.get("sub_senses_translated") or [])
+                    if j < len(translated) and translated[j]:
+                        parts.append(f'            <span class="sense-si">{html.escape(translated[j])}</span>')
+                    parts.append("          </li>")
+                parts.append("        </ul>")
+            if d.get("synonyms"):
+                syns = ", ".join(html.escape(s) for s in d["synonyms"])
+                parts.append(f'        <p class="synonyms">{syns}</p>')
+            parts.append("      </li>")
+        parts.append("    </ol>")
+
+    return parts
+
+
+def render_simple(rec: dict) -> list[str]:
+    """Render a simple (translation-only) enrichment record."""
+    parts = []
+    if rec.get("pos"):
+        parts.append(f'    <p class="pos"><em>{html.escape(rec["pos"])}</em></p>')
+    if rec.get("romanized"):
+        parts.append(f'    <p class="romanized">/{html.escape(rec["romanized"])}/</p>')
+    if rec.get("alternatives"):
+        alts = ", ".join(html.escape(a) for a in rec["alternatives"])
+        parts.append(f'    <p class="alternatives">{alts}</p>')
+    return parts
 
 
 def tab_to_xml(tab_file: str, enriched_file: str | None = None) -> str:
@@ -51,9 +121,7 @@ def tab_to_xml(tab_file: str, enriched_file: str | None = None) -> str:
             defs = [d.strip() for d in definitions.split("|") if d.strip()]
             if not word or not defs:
                 continue
-            # Skip headwords starting with a combining character — they are
-            # malformed (e.g. a Sinhala vowel sign with no base consonant) and
-            # cause normalize_key_text to abort.
+            # Skip headwords starting with a combining character — malformed data
             if unicodedata.category(word[0]) in ("Mn", "Mc", "Me"):
                 continue
             entries.append((i, word, defs))
@@ -69,6 +137,8 @@ def tab_to_xml(tab_file: str, enriched_file: str | None = None) -> str:
         parts.append(f'  <d:entry id="entry_{entry_id}" d:title="{ew}">')
         parts.append(f'    <d:index d:value="{ew}"/>')
         parts.append(f"    <h1>{ew}</h1>")
+
+        # Base definitions from .tab file
         if len(defs) == 1:
             parts.append(f"    <p>{html.escape(defs[0])}</p>")
         else:
@@ -76,15 +146,15 @@ def tab_to_xml(tab_file: str, enriched_file: str | None = None) -> str:
             for d in defs:
                 parts.append(f"      <li>{html.escape(d)}</li>")
             parts.append("    </ol>")
+
+        # Enriched content (if available)
         if word in enriched:
             rec = enriched[word]
-            if rec.get("pos"):
-                parts.append(f'    <p class="pos"><em>{html.escape(rec["pos"])}</em></p>')
-            if rec.get("romanized"):
-                parts.append(f'    <p class="romanized">/{html.escape(rec["romanized"])}/</p>')
-            if rec.get("alternatives"):
-                alts = ", ".join(html.escape(a) for a in rec["alternatives"])
-                parts.append(f'    <p class="alternatives">{alts}</p>')
+            if "definitions" in rec:
+                parts.extend(render_rich(rec))
+            else:
+                parts.extend(render_simple(rec))
+
         parts.append("  </d:entry>")
 
     parts.append("</d:dictionary>")
@@ -95,11 +165,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("tab_file", help="Input .tab file")
     parser.add_argument("-o", "--output", help="Output XML file (default: stdout)")
-    parser.add_argument(
-        "--enriched",
-        help="Optional enriched .jsonl file from enrich.py",
-        default=None,
-    )
+    parser.add_argument("--enriched", help="Optional enriched .jsonl from enrich.py", default=None)
     args = parser.parse_args()
 
     xml = tab_to_xml(args.tab_file, args.enriched)
